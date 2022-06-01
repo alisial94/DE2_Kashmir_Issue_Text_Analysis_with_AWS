@@ -1,0 +1,207 @@
+# Load Packages
+
+library(rvest)
+library(data.table)
+library(dplyr)
+library(xml2)
+library(aws.comprehend)
+library(ggplot2)
+library(plotrix)
+
+
+
+
+########################
+       Article 1       #
+########################
+
+url1 <- ("https://www.dawn.com/news/1638896")
+
+webpage1 <- read_html(url1)
+
+## Title Sentiment
+
+t1 <- webpage1 %>% html_nodes(".border-b-grey-default .story__link") %>% html_text()
+
+t1s <- detect_sentiment(t1)
+
+t1s
+
+
+
+## Body Overall Sentiment
+
+b1 <- webpage1 %>% html_nodes(".mt-1 p:nth-child(1) , p:nth-child(15) , p:nth-child(13) , p:nth-child(12) , p:nth-child(10) , p:nth-child(9) , blockquote+ p , p:nth-child(3) , .mt-1 p:nth-child(2)")  %>% html_text()
+
+b1 <- paste(b1, collapse="")
+
+b1s <- detect_sentiment(b1)
+
+b1s
+
+b1s$Sentiment<-NULL
+
+b1s <- b1s %>% gather("Sentiment","Rating",-1)
+
+b1s$ymax = cumsum(b1s$Rating)
+b1s$ymin = c(0, head(b1s$ymax, n=-1))
+
+b1s$labelPosition <- (b1s$ymax + b1s$ymin) / 2
+b1s$label <- paste0(b1s$Sentiment, "\n  ", round(b1s$Rating*100,2))
+
+ggplot(b1s, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Sentiment)) +
+  geom_rect() +
+  geom_text( x=2, aes(y=labelPosition, label=label, color=Sentiment), size=3) + # x here controls label position (inner / outer)
+  scale_fill_brewer(palette=4) +
+  scale_color_brewer(palette=4) +
+  coord_polar(theta="y") +
+  xlim(c(-1, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+
+
+
+## Body Detailed Sentiment
+
+b1d <- webpage1 %>% html_nodes("p:nth-child(15) , p:nth-child(14) , p:nth-child(13) , p:nth-child(12) , p:nth-child(10) , p:nth-child(9) , p:nth-child(8) , blockquote+ p , p:nth-child(4) , p:nth-child(3) , .mt-1 p:nth-child(2) , .mt-1 p:nth-child(1)") %>% html_text()
+
+b1ds <- detect_sentiment(b1d)
+
+b1ds
+
+
+b1ds <- b1ds %>% gather(`Mixed`,`Negative`, `Neutral`, `Positive` , key = Sentiment, value = Probability ) %>% arrange(Index)
+
+ggplot(b1ds) +
+  aes(x = as.factor(Index), fill = Sentiment, weight = Probability) +
+  geom_bar() +
+  scale_fill_viridis_d(option = "viridis", direction = 1, alpha = 0.8) +
+  theme_bw() +
+  labs(x = "Paragraph", y = "Probability") +
+  theme(legend.position = "bottom")
+
+
+
+##### Supporting Speed by PM of Pakistan - Phrases
+
+url1s <- "https://www.thenews.com.pk/latest/785527-pm-imran-khan-asks-modi"
+
+url1s <- read_html(url1s)
+
+support1 <- url1s %>% html_nodes("p:nth-child(22) , p+ p , .ads_between_content+ p") %>% html_text()
+
+
+support1 <- paste(support1, collapse="")
+
+support1 <- detect_phrases(support1)
+
+support1 <- support1 %>% 
+  group_by(Text) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count)) %>% head(20)
+   
+ggplot (support1) +
+   (aes(x=Text, y=count)) +
+  geom_bar(stat="identity", fill="darkgreen", alpha=.6, width=.4) +
+  coord_flip() +
+  xlab("") +
+  theme_bw()
+
+########################
+       Article 2       #
+########################
+
+url2 <- ("https://www.thehindu.com/news/national/india-slams-pakistan-for-raising-kashmir-issue-at-un-calls-it-worlds-biggest-destabilising-force/article36835088.ece")
+
+webpage2 <- read_html(url2)
+
+
+## Title Sentiment
+
+t2 <- webpage2 %>% html_nodes(".article .title") %>% html_text()
+
+t2s <- detect_sentiment(t2)
+
+t2s
+
+t2s$Sentiment<-NULL
+
+t2s <- t2s %>% gather("sentiment","Rating",-1)
+
+## Body Overall Sentiment
+
+b2 <- webpage2 %>% html_nodes("p:nth-child(23) , p:nth-child(19) , p:nth-child(16) , p:nth-child(14) , p:nth-child(12) , p:nth-child(11) , p:nth-child(10) , p:nth-child(9) , #div-gpt-ad-1564640628558-0+ p , p:nth-child(4) , #artmeterinlinewrap+ div p:nth-child(1)")  %>% html_text()
+
+b2 <- paste(b2, collapse="")
+
+b2s <- detect_sentiment(b2)
+
+b2s
+
+b2s$Sentiment<-NULL
+
+b2s <- b2s %>% gather("Sentiment","Rating",-1)
+
+b2s$ymax = cumsum(b2s$Rating)
+b2s$ymin = c(0, head(b2s$ymax, n=-1))
+
+b2s$labelPosition <- (b2s$ymax + b2s$ymin) / 2
+b2s$label <- paste0(b2s$Sentiment, "\n  ", round(b2s$Rating*100,2))
+
+ggplot(b2s, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Sentiment)) +
+  geom_rect() +
+  geom_text( x=2, aes(y=labelPosition, label=label, color=Sentiment), size=3) + # x here controls label position (inner / outer)
+  scale_fill_brewer(palette=4) +
+  scale_color_brewer(palette=4) +
+  coord_polar(theta="y") +
+  xlim(c(-1, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+
+
+## Body Detailed Sentiment
+
+b2d <- webpage2 %>% html_nodes("#artmeterinlinewrap+ div p") %>% html_text()
+
+b2ds <- detect_sentiment(b2d)
+
+b2ds
+
+b2ds <- b2ds %>% gather(`Mixed`,`Negative`, `Neutral`, `Positive` , key = Sentiment, value = Probability ) %>% arrange(Index)
+
+ggplot(b2ds) +
+  aes(x = as.factor(Index), fill = Sentiment, weight = Probability) +
+  geom_bar() +
+  scale_fill_viridis_d(option = "viridis", direction = 1, alpha = 0.8) +
+  theme_bw() +
+  labs(x = "Paragraph", y = "Probability") +
+  theme(legend.position = "bottom")
+
+
+
+
+
+
+##### Supporting Speed by PM of India - Phrases
+
+url2s <- "https://edition.cnn.com/2019/08/08/asia/india-modi-kashmir-address-intl/index.html"
+
+url2s <- read_html(url2s)
+
+support2 <- url2s %>% html_nodes(".el__embedded--standard+ .zn-body__paragraph , .cn--idx-25~ .zn-body__paragraph , .zn-body__paragraph:nth-child(5) , .zn-body__paragraph:nth-child(4) , .cn-zoneAdContainer+ .zn-body__paragraph , .el__leafmedia--sourced-paragraph~ .zn-body__paragraph:nth-child(3) , .el__leafmedia--sourced-paragraph+ .zn-body__paragraph , .speakable , .pg-headline") %>% html_text()
+
+support2 <- paste(support2, collapse="")
+
+support2 <- detect_phrases(support2)
+
+support2 <- support2 %>% 
+  group_by(Text) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count)) %>% head(20)
+
+ggplot (support2) +
+  (aes(x=Text, y=count)) +
+  geom_bar(stat="identity", fill="blue", alpha=.6, width=.4) +
+  coord_flip() +
+  xlab("") +
+  theme_bw()
